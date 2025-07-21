@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Interactive Headphones - Math Explorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            overflow-x: hidden;
+            height: 100%;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at 20% 30%, #6d1b7b 0%, #2d174d 40%, transparent 80%),
+                radial-gradient(ellipse at 70% 60%, #1b1b7b 0%, #0d1b3b 60%, transparent 100%),
+                linear-gradient(120deg, #6d1b7b 0%, #2d174d 40%, #1b1b7b 70%, #0d1b3b 100%);
+            background-blend-mode: screen, lighten, normal;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background: transparent !important;
+            color: #f3eaff;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 60%, rgba(99, 102, 241, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -2;
+        }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px),
+                repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 4px);
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .floating-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            background: linear-gradient(45deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1));
+            animation: float 15s infinite ease-in-out;
+        }
+        
+        .shape:nth-child(1) {
+            width: 100px;
+            height: 100px;
+            top: 10%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+        
+        .shape:nth-child(2) {
+            width: 150px;
+            height: 150px;
+            top: 60%;
+            right: 15%;
+            animation-delay: -5s;
+        }
+        
+        .shape:nth-child(3) {
+            width: 80px;
+            height: 80px;
+            bottom: 20%;
+            left: 70%;
+            animation-delay: -10s;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-20px) rotate(120deg); }
+            66% { transform: translateY(10px) rotate(240deg); }
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            margin-top: 0;
+            background: transparent !important;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            padding: 25px;
+            border-radius: 20px;
+            max-width: 380px;
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.2);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+        }
+        
+        #info-panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 60px rgba(139, 92, 246, 0.3);
+        }
+        
+        #math-detail {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            background: linear-gradient(135deg, rgba(107, 115, 255, 0.15), rgba(255, 0, 110, 0.15));
+            backdrop-filter: blur(25px);
+            border: 2px solid rgba(139, 92, 246, 0.4);
+            padding: 35px;
+            border-radius: 25px;
+            max-width: 450px;
+            max-height: 85vh;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 25px 50px rgba(139, 92, 246, 0.25);
+            animation: slideInRight 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes slideInRight {
+            from { 
+                opacity: 0; 
+                transform: translateY(-50%) translateX(100px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(-50%) translateX(0); 
+            }
+        }
+        
+        .wave-animation {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(45deg, #1a1a2e, #16213e);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            margin: 20px 0;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 25px rgba(139, 92, 246, 0.3);
+        }
+        
+        .sound-wave-viz {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+        
+        .wave-bar {
+            width: 4px;
+            background: linear-gradient(to top, #8b5cf6, #ec4899, #6366f1);
+            border-radius: 2px;
+            animation: wavePattern 2s ease-in-out infinite;
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+        }
+        
+        .wave-bar:nth-child(1) { height: 20%; animation-delay: 0s; }
+        .wave-bar:nth-child(2) { height: 40%; animation-delay: 0.1s; }
+        .wave-bar:nth-child(3) { height: 80%; animation-delay: 0.2s; }
+        .wave-bar:nth-child(4) { height: 60%; animation-delay: 0.3s; }
+        .wave-bar:nth-child(5) { height: 90%; animation-delay: 0.4s; }
+        .wave-bar:nth-child(6) { height: 70%; animation-delay: 0.5s; }
+        .wave-bar:nth-child(7) { height: 50%; animation-delay: 0.6s; }
+        .wave-bar:nth-child(8) { height: 85%; animation-delay: 0.7s; }
+        .wave-bar:nth-child(9) { height: 45%; animation-delay: 0.8s; }
+        .wave-bar:nth-child(10) { height: 75%; animation-delay: 0.9s; }
+        .wave-bar:nth-child(11) { height: 35%; animation-delay: 1s; }
+        .wave-bar:nth-child(12) { height: 95%; animation-delay: 1.1s; }
+        
+        @keyframes wavePattern {
+            0%, 100% { transform: scaleY(1); opacity: 0.7; }
+            50% { transform: scaleY(1.5); opacity: 1; }
+        }
+        
+        .wave {
+            display: none;
+        }
+        
+        @keyframes wave-move {
+            0% { transform: translateX(-50%); }
+            100% { transform: translateX(0%); }
+        }
+        
+        .formula {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.1));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 15px;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            border-left: 4px solid #8b5cf6;
+            box-shadow: 0 8px 16px rgba(139, 92, 246, 0.15);
+            transition: all 0.3s ease;
+        }
+        
+        .formula:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(139, 92, 246, 0.25);
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: linear-gradient(45deg, #ff006e, #8b5cf6);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 0, 110, 0.3);
+        }
+        
+        .close-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 8px 20px rgba(255, 0, 110, 0.5);
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 15px 30px rgba(139, 92, 246, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .controls:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.25);
+        }
+        
+        h1 {
+            background: linear-gradient(45deg, #8b5cf6, #ec4899, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+            font-size: 2em;
+            font-weight: 700;
+            text-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+        }
+        
+        h2 {
+            background: linear-gradient(45deg, #ec4899, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 18px;
+            font-size: 1.6em;
+            font-weight: 600;
+        }
+        
+        h3 {
+            background: linear-gradient(45deg, #6366f1, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 20px 0 12px 0;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        
+        .clickable-part {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .frequency-viz {
+            width: 100%;
+            height: 140px;
+            background: linear-gradient(135deg, #000428, #004e92);
+            border: 2px solid rgba(139, 92, 246, 0.4);
+            border-radius: 15px;
+            margin: 15px 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.3), 0 8px 16px rgba(139, 92, 246, 0.2);
+        }
+        
+        .frequency-spectrum {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 10px;
+        }
+        
+        .freq-bar {
+            width: 8px;
+            background: linear-gradient(to top, #8b5cf6, #ec4899, #6366f1);
+            border-radius: 4px 4px 0 0;
+            animation: frequency-dance 1.8s ease-in-out infinite;
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.6);
+            margin: 0 1px;
+        }
+        
+        .freq-bar:nth-child(1) { animation-delay: 0s; height: 25%; }
+        .freq-bar:nth-child(2) { animation-delay: 0.1s; height: 45%; }
+        .freq-bar:nth-child(3) { animation-delay: 0.2s; height: 70%; }
+        .freq-bar:nth-child(4) { animation-delay: 0.3s; height: 55%; }
+        .freq-bar:nth-child(5) { animation-delay: 0.4s; height: 85%; }
+        .freq-bar:nth-child(6) { animation-delay: 0.5s; height: 65%; }
+        .freq-bar:nth-child(7) { animation-delay: 0.6s; height: 40%; }
+        .freq-bar:nth-child(8) { animation-delay: 0.7s; height: 90%; }
+        .freq-bar:nth-child(9) { animation-delay: 0.8s; height: 50%; }
+        .freq-bar:nth-child(10) { animation-delay: 0.9s; height: 75%; }
+        
+        .spectrum-label {
+            position: absolute;
+            bottom: 5px;
+            left: 10px;
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.7);
+            font-style: italic;
+        }
+        
+        @keyframes frequency-dance {
+            0%, 100% { height: 20%; }
+            50% { height: 80%; }
+        }
+
+        /* Title bar styles */
+        #title-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 2em auto 2em auto;
+            background: linear-gradient(90deg, #6b73ff 0%, #8b5cf6 100%);
+            box-shadow: 0 2px 20px #8b5cf655;
+            padding: 0.7em 2.5em;
+            border-radius: 18px;
+            width: fit-content;
+            min-width: 320px;
+            max-width: 90vw;
+        }
+        #main-title {
+            text-align: center;
+            font-size: 3.2em;
+            letter-spacing: 1.5px;
+            color: #fff;
+            margin: 0;
+            font-weight: bold;
+            background: none;
+            -webkit-background-clip: unset;
+            -webkit-text-fill-color: unset;
+            background-clip: unset;
+        }
+
+        #info-panel, #math-detail, .controls, .formula {
+            background: linear-gradient(90deg, #6b73ff 0%, #8b5cf6 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 20px;
+            box-shadow: 0 0 8px 2px #8b5cf688, 0 4px 12px #6b73ff33;
+            color: #f3eaff;
+        }
+
+        #info-panel, #math-detail, .controls, .formula,
+        h1, h2, h3, h4, p, span, strong, em, li {
+            color: #f3eaff !important;
+        }
+        #info-panel, #math-detail, .controls, .formula {
+            box-shadow: 0 0 8px 2px #8b5cf688, 0 4px 12px #6b73ff33;
+        }
+
+        /* --- MICROPHONE BUTTONS FINAL STYLE OVERRIDE --- */
+        #mic-controls {
+            position: fixed !important;
+            right: 2vw !important;
+            bottom: 2vw !important;
+            z-index: 300 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 1em !important;
+        }
+        #mic-controls button {
+            padding: 0.7em 1.5em !important;
+            font-size: 1.1em !important;
+            border: none !important;
+            border-radius: 12px !important;
+            cursor: pointer !important;
+            font-weight: bold !important;
+            margin: 0 !important;
+            color: #f3eaff !important;
+            background: linear-gradient(90deg, #6b73ff 0%, #8b5cf6 100%) !important;
+            box-shadow: 0 0 8px 2px #8b5cf688, 0 4px 12px #6b73ff33 !important;
+            transition: box-shadow 0.3s, background 0.3s !important;
+            outline: none !important;
+            min-width: 170px !important;
+            text-align: center !important;
+            letter-spacing: 0.5px !important;
+        }
+        #mic-controls button:hover {
+            box-shadow: 0 0 16px 4px #8b5cf6cc, 0 8px 24px #6b73ff55 !important;
+            background: linear-gradient(90deg, #8b5cf6 0%, #6b73ff 100%) !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="title-bar">
+        <h1 id="main-title">🎧 Explore the Math Inside Headphones</h1>
+    </div>
+    <div id="container">
+        <div id="info-panel">
+            <p style="text-align: center; font-size: 1.1em; margin-bottom: 1em;">Click on different parts of the headphones or the waves below to see the math and science behind them!</p>
+            <p><strong>Click on different parts:</strong></p>
+            <p>• <span style="color: #ff6b6b; text-shadow: 0 0 10px rgba(255, 107, 107, 0.5);">Drivers</span> - Sound generation</p>
+            <p>• <span style="color: #4ecdc4; text-shadow: 0 0 10px rgba(78, 205, 196, 0.5);">Ear Cups</span> - Acoustic design</p>
+            <p>• <span style="color: #45b7d1; text-shadow: 0 0 10px rgba(69, 183, 209, 0.5);">Headband</span> - Structural mechanics</p>
+            <p>• <span style="color: #f9ca24; text-shadow: 0 0 10px rgba(249, 202, 36, 0.5);">Cable</span> - Signal processing</p>
+            <br>
+            <p><em>Drag to rotate • Scroll to zoom</em></p>
+        </div>
+        
+        <div id="math-detail">
+            <button class="close-btn" onclick="closeMathDetail()">&times;</button>
+            <div id="math-content"></div>
+        </div>
+        
+        <div class="controls">
+            <p><strong>Mouse Controls:</strong></p>
+            <p>Left click + drag: Rotate</p>
+            <p>Scroll wheel: Zoom</p>
+        </div>
+    </div>
+    <!-- Interactive wave area at the bottom -->
+    <div id="wave-area" style="position: fixed; left: 0; right: 0; bottom: 0; width: 100vw; display: none; justify-content: center; align-items: flex-end; z-index: 50;">
+        <div id="waves-canvas-container" style="width: 90vw; max-width: 900px; height: 180px; background: #181c20; border-radius: 20px 20px 0 0; box-shadow: 0 -4px 30px #8b5cf655; display: flex; align-items: flex-end; justify-content: center; position: relative;">
+            <canvas id="waves-canvas" width="900" height="180" style="width: 100%; height: 100%; cursor: pointer;"></canvas>
+            <div style="position: absolute; left: 10px; bottom: 10px; color: #00ffb3; font-weight: bold;">Noise</div>
+            <div style="position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); color: #ff006e; font-weight: bold;">Anti-Noise</div>
+            <div style="position: absolute; right: 10px; bottom: 10px; color: #fff; font-weight: bold;">Result</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let scene, camera, renderer, headphones;
+            let isRotating = false;
+            let mouseX = 0, mouseY = 0;
+            let targetRotationX = 0, targetRotationY = 0;
+            let currentRotationX = 0, currentRotationY = 0;
+            let selectedPart = null;
+            
+            const mathContent = {
+                driver: {
+                    title: "🔊 Speaker Drivers - Sound Generation",
+                    content: `
+                        <h3>Trigonometry in Sound Waves</h3>
+                        <div class="formula">
+                            y(t) = A sin(2πft + φ)
+                            <br>Where: A = amplitude, f = frequency, φ = phase
+                        </div>
+                        <div class="wave-animation"><div class="wave"></div></div>
+                        
+                        <h3>Fourier Transform - Frequency Analysis</h3>
+                        <div class="formula">
+                            F(ω) = ∫ f(t)e^(-iωt) dt
+                            <br>Converts time domain → frequency domain
+                        </div>
+                        <div class="frequency-viz">
+                            <div class="freq-bar" style="left: 10px; animation-delay: 0s;"></div>
+                            <div class="freq-bar" style="left: 25px; animation-delay: 0.1s;"></div>
+                            <div class="freq-bar" style="left: 40px; animation-delay: 0.2s;"></div>
+                            <div class="freq-bar" style="left: 55px; animation-delay: 0.3s;"></div>
+                            <div class="freq-bar" style="left: 70px; animation-delay: 0.4s;"></div>
+                            <div class="freq-bar" style="left: 85px; animation-delay: 0.5s;"></div>
+                        </div>
+                        
+                        <h3>Linear Algebra - Driver Control</h3>
+                        <div class="formula">
+                            [Vout] = [H11 H12] [Vin]
+                            <br>[Iout]   [H21 H22] [Iin]
+                            <br>Transfer function matrix for driver response
+                        </div>
+                        
+                        <p><strong>How it works:</strong> The voice coil moves in a magnetic field, creating sound waves through trigonometric motion. Fourier transforms help analyze frequency response, while linear algebra models the electrical-to-mechanical conversion.</p>
+                    `
+                },
+                
+                earcup: {
+                    title: "🎵 Ear Cups - Acoustic Engineering",
+                    content: `
+                        <h3>Probability & Statistics - Sound Distribution</h3>
+                        <div class="formula">
+                            P(f) = (1/σ√2π)e^(-(f-μ)²/2σ²)
+                            <br>Gaussian distribution of frequency response
+                        </div>
+                        
+                        <h3>Trigonometry - Wave Interference</h3>
+                        <div class="formula">
+                            I = I₁ + I₂ + 2√(I₁I₂)cos(δ)
+                            <br>Constructive/destructive interference patterns
+                        </div>
+                        <div class="wave-animation"><div class="wave"></div></div>
+                        
+                        <h3>Linear Algebra - Acoustic Modeling</h3>
+                        <div class="formula">
+                            [P] = [Z][V]
+                            <br>Pressure = Impedance × Velocity matrix
+                        </div>
+                        
+                        <h3>Statistics - Noise Cancellation</h3>
+                        <div class="formula">
+                            SNR = 10log₁₀(P_signal/P_noise)
+                            <br>Signal-to-noise ratio optimization
+                        </div>
+                        
+                        <p><strong>How it works:</strong> Ear cup geometry uses statistical analysis to optimize sound isolation. Wave interference patterns are calculated using trigonometry, while linear algebra models acoustic impedance matching.</p>
+                    `
+                },
+                
+                headband: {
+                    title: "⚖️ Headband - Structural Mechanics",
+                    content: `
+                        <h3>Linear Algebra - Force Distribution</h3>
+                        <div class="formula">
+                            F = K × d
+                            <br>[F₁] = [k₁₁ k₁₂] [d₁]
+                            <br>[F₂]   [k₂₁ k₂₂] [d₂]
+                            <br>Stiffness matrix for force distribution
+                        </div>
+                        
+                        <h3>Trigonometry - Curvature Design</h3>
+                        <div class="formula">
+                            r = 1/κ = (1 + y'²)^(3/2) / |y''|
+                            <br>Radius of curvature for comfort
+                        </div>
+                        
+                        <h3>Statistics - Pressure Distribution</h3>
+                        <div class="formula">
+                            σ = √(Σ(pᵢ - p̄)²/n)
+                            <br>Standard deviation of pressure points
+                        </div>
+                        
+                        <h3>Probability - Material Fatigue</h3>
+                        <div class="formula">
+                            P(failure) = 1 - e^(-λt)
+                            <br>Exponential distribution for reliability
+                        </div>
+                        
+                        <p><strong>How it works:</strong> The headband uses linear algebra to distribute weight evenly across the head. Trigonometric curves ensure comfort, while statistical analysis optimizes pressure distribution and probability models predict durability.</p>
+                    `
+                },
+                
+                cable: {
+                    title: "⚡ Cable - Signal Processing",
+                    content: `
+                        <h3>Fourier Transform - Signal Analysis</h3>
+                        <div class="formula">
+                            H(jω) = |H(jω)|e^(jφ(ω))
+                            <br>Frequency response with magnitude and phase
+                        </div>
+                        <div class="frequency-viz">
+                            <div class="freq-bar" style="left: 5px; animation-delay: 0s;"></div>
+                            <div class="freq-bar" style="left: 15px; animation-delay: 0.05s;"></div>
+                            <div class="freq-bar" style="left: 25px; animation-delay: 0.1s;"></div>
+                            <div class="freq-bar" style="left: 35px; animation-delay: 0.15s;"></div>
+                            <div class="freq-bar" style="left: 45px; animation-delay: 0.2s;"></div>
+                        </div>
+                        
+                        <h3>Linear Algebra - Impedance Matching</h3>
+                        <div class="formula">
+                            Z = R + jωL + 1/(jωC)
+                            <br>Complex impedance calculation
+                        </div>
+                        
+                        <h3>Probability - Noise Modeling</h3>
+                        <div class="formula">
+                            N(t) = Σ aₙcos(ωₙt + φₙ)
+                            <br>Random noise as sum of sinusoids
+                        </div>
+                        
+                        <h3>Trigonometry - AC Signal Transmission</h3>
+                        <div class="formula">
+                            v(t) = V_m sin(ωt + θ)
+                            <br>Sinusoidal voltage transmission
+                        </div>
+                        <div class="wave-animation"><div class="wave"></div></div>
+                        
+                        <p><strong>How it works:</strong> Cables transmit AC signals using trigonometric waveforms. Fourier transforms analyze signal integrity, linear algebra models impedance matching, and probability theory helps minimize electromagnetic interference.</p>
+                    `
+                }
+            };
+            
+            function init() {
+                // Scene setup
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0a23);
+                scene.fog = new THREE.Fog(0x0a0a23, 10, 50);
+                
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(0, 0, 8);
+                
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                document.getElementById('container').appendChild(renderer.domElement);
+                
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0x8b5cf6, 0.4);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                directionalLight.position.set(5, 5, 5);
+                directionalLight.castShadow = true;
+                scene.add(directionalLight);
+                
+                const pointLight1 = new THREE.PointLight(0x8b5cf6, 0.8, 100);
+                pointLight1.position.set(-5, 0, 5);
+                scene.add(pointLight1);
+                
+                const pointLight2 = new THREE.PointLight(0xec4899, 0.6, 100);
+                pointLight2.position.set(5, -3, 3);
+                scene.add(pointLight2);
+                
+                const pointLight3 = new THREE.PointLight(0x6366f1, 0.7, 100);
+                pointLight3.position.set(0, 5, -3);
+                scene.add(pointLight3);
+                
+                // Load GLB headphones model
+                const loader = new THREE.GLTFLoader();
+                loader.load('headphones.glb', function(gltf) {
+                    headphones = gltf.scene;
+                    // Center and scale the model if needed
+                    headphones.position.set(0, 0, 0);
+                    headphones.scale.set(2.5, 2.5, 2.5); // Adjust scale as needed
+                    scene.add(headphones);
+                }, undefined, function(error) {
+                    console.error('Error loading GLB model:', error);
+                });
+
+                // Event listeners
+                setupEventListeners();
+
+                // Start animation
+                animate();
+            }
+            
+            function setupEventListeners() {
+                const canvas = renderer.domElement;
+                
+                canvas.addEventListener('mousedown', onMouseDown, false);
+                canvas.addEventListener('mousemove', onMouseMove, false);
+                canvas.addEventListener('mouseup', onMouseUp, false);
+                canvas.addEventListener('wheel', onMouseWheel, { passive: false }); // prevent default for zoom
+                canvas.addEventListener('click', onCanvasClick, false);
+
+                // Prevent pinch-zoom on canvas (trackpad)
+                canvas.addEventListener('gesturestart', e => e.preventDefault());
+                canvas.addEventListener('gesturechange', e => e.preventDefault());
+                canvas.addEventListener('gestureend', e => e.preventDefault());
+
+                // For trackpad pinch-zoom (ctrl+wheel or pinch), zoom camera
+                canvas.addEventListener('wheel', function(event) {
+                    if (event.ctrlKey) {
+                        event.preventDefault();
+                        camera.position.z += event.deltaY * 0.01;
+                        camera.position.z = Math.max(3, Math.min(15, camera.position.z));
+                    }
+                }, { passive: false });
+
+                window.addEventListener('resize', onWindowResize, false);
+            }
+            
+            function onMouseDown(event) {
+                isRotating = true;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            }
+            
+            function onMouseMove(event) {
+                if (!isRotating) return;
+                
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                targetRotationY += deltaX * 0.01;
+                targetRotationX += deltaY * 0.01;
+                
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            }
+            
+            function onMouseUp() {
+                isRotating = false;
+            }
+            
+            function onMouseWheel(event) {
+                camera.position.z += event.deltaY * 0.01;
+                camera.position.z = Math.max(3, Math.min(15, camera.position.z));
+            }
+            
+            function onCanvasClick(event) {
+                const mouse = new THREE.Vector2();
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+                
+                const intersects = raycaster.intersectObjects(headphones.children, true);
+                
+                if (intersects.length > 0) {
+                    const clickedObject = intersects[0].object;
+                    const partType = clickedObject.userData.type;
+                    
+                    if (partType && mathContent[partType]) {
+                        showMathDetail(partType);
+                    }
+                }
+            }
+            
+            function showMathDetail(partType) {
+                const panel = document.getElementById('math-detail');
+                const content = document.getElementById('math-content');
+                
+                content.innerHTML = mathContent[partType].content;
+                panel.style.display = 'block';
+                
+                // Highlight the clicked part
+                highlightPart(partType);
+            }
+            
+            function highlightPart(partType) {
+                // Reset all materials
+                headphones.children.forEach(child => {
+                    if (child.material) {
+                        child.material.emissive = new THREE.Color(0x000000);
+                    }
+                });
+                
+                // Highlight selected parts
+                headphones.children.forEach(child => {
+                    if (child.userData.type === partType) {
+                        child.material.emissive = new THREE.Color(0x222222);
+                    }
+                });
+            }
+            
+            function closeMathDetail() {
+                document.getElementById('math-detail').style.display = 'none';
+                
+                // Remove highlights
+                headphones.children.forEach(child => {
+                    if (child.material) {
+                        child.material.emissive = new THREE.Color(0x000000);
+                    }
+                });
+            }
+            
+            function onWindowResize() {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+            
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                // Smooth rotation
+                currentRotationX += (targetRotationX - currentRotationX) * 0.05;
+                currentRotationY += (targetRotationY - currentRotationY) * 0.05;
+                
+                headphones.rotation.x = currentRotationX;
+                headphones.rotation.y = currentRotationY;
+                
+                // Auto-rotate when not interacting
+                if (!isRotating) {
+                    headphones.rotation.y += 0.005;
+                }
+                
+                renderer.render(scene, camera);
+            }
+            
+            // Initialize the scene
+            init();
+
+            // Add microphone and wave logic below existing JS
+            let audioContext = null;
+            let analyser = null;
+            let dataArray = null;
+            let micStream = null;
+            let waveAnimId = null;
+            const waveArea = document.getElementById('wave-area');
+            const wavesCanvas = document.getElementById('waves-canvas');
+
+            const startMicBtn = document.getElementById('start-mic');
+            const stopMicBtn = document.getElementById('stop-mic');
+
+            startMicBtn.onclick = async () => {
+                waveArea.style.display = 'flex';
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    try {
+                        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        const source = audioContext.createMediaStreamSource(micStream);
+                        analyser = audioContext.createAnalyser();
+                        analyser.fftSize = 1024;
+                        source.connect(analyser);
+                        dataArray = new Float32Array(analyser.fftSize);
+                    } catch (e) {
+                        alert('Microphone access denied or unavailable.');
+                        waveArea.style.display = 'none';
+                        return;
+                    }
+                }
+                if (!waveAnimId) animateWaves();
+            };
+
+            stopMicBtn.onclick = () => {
+                waveArea.style.display = 'none';
+                cancelAnimationFrame(waveAnimId);
+                waveAnimId = null;
+                if (micStream) {
+                    micStream.getTracks().forEach(track => track.stop());
+                    micStream = null;
+                }
+                if (audioContext) {
+                    audioContext.close();
+                    audioContext = null;
+                    analyser = null;
+                    dataArray = null;
+                }
+            };
+
+            function animateWaves() {
+                const ctx = wavesCanvas.getContext('2d');
+                ctx.clearRect(0, 0, wavesCanvas.width, wavesCanvas.height);
+                let t = Date.now() * 0.002;
+                let voiceWave = [];
+                if (analyser && dataArray) {
+                    analyser.getFloatTimeDomainData(dataArray);
+                    // Downsample to canvas width
+                    for (let x = 0; x < wavesCanvas.width; x++) {
+                        let i = Math.floor(x / wavesCanvas.width * dataArray.length);
+                        voiceWave[x] = dataArray[i] || 0;
+                    }
+                } else {
+                    // fallback: animated sine if no mic
+                    for (let x = 0; x < wavesCanvas.width; x++) {
+                        voiceWave[x] = Math.sin(2 * Math.PI * (x / 180) + t) * 0.5;
+                    }
+                }
+                // Draw three waves: noise (voice), anti-noise (inverse), result (sum)
+                for (let i = 0; i < 3; i++) {
+                    ctx.save();
+                    let color, amp;
+                    if (i === 0) { color = '#00ffb3'; amp = 60; } // Noise
+                    if (i === 1) { color = '#ff006e'; amp = 60; } // Anti-noise
+                    if (i === 2) { color = '#fff'; amp = 60; } // Result
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = (i === 2) ? 3 : 2;
+                    ctx.beginPath();
+                    for (let x = 0; x < wavesCanvas.width; x++) {
+                        let y;
+                        if (i === 0) {
+                            y = wavesCanvas.height/2 + amp * voiceWave[x];
+                        } else if (i === 1) {
+                            y = wavesCanvas.height/2 - amp * voiceWave[x];
+                        } else {
+                            // Result = noise + anti-noise (should be near flat)
+                            y = wavesCanvas.height/2 + amp * (voiceWave[x] + (-voiceWave[x]));
+                        }
+                        if (x === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                    ctx.restore();
+                }
+                waveAnimId = requestAnimationFrame(animateWaves);
+            }
+
+            // Remove math popup from wave panel click
+            wavesCanvas.onclick = function(e) {
+                // Do nothing on wave click
+            };
+
+            function showWaveMath() {
+                // Show math/visual explanation for noise cancellation
+                const panel = document.getElementById('math-detail');
+                const content = document.getElementById('math-content');
+                content.innerHTML = `
+                    <h2>🎤 Noise Cancellation: Math & Visuals</h2>
+                    <div class="formula">Final = Noise + Anti-Noise = Flat Line<br>
+                    y(t) = A sin(ωt) + A sin(ωt + π) = 0</div>
+                    <canvas id='zoomed-wave-canvas' width='400' height='120' style='width: 100%; background: #181c20; border-radius: 10px; margin: 1em 0;'></canvas>
+                    <p style="margin-top: 1em; font-size: 1.1em; color: #fff;">Noise-cancelling headphones use microphones to detect ambient noise (green), generate an anti-noise wave (pink) with opposite phase, and combine them to produce silence (white). This is achieved using trigonometry and signal processing.</p>
+                `;
+                panel.style.display = 'block';
+                drawZoomedWave();
+            }
+            function closeWaveMath() {
+                document.getElementById('math-detail').style.display = 'none';
+            }
+            function drawZoomedWave() {
+                const c = document.getElementById('zoomed-wave-canvas');
+                if (!c) return;
+                const ctx = c.getContext('2d');
+                ctx.clearRect(0, 0, c.width, c.height);
+                // Draw noise
+                ctx.strokeStyle = '#00ffb3'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let x = 0; x < c.width; x++) {
+                    let y = c.height/2 + 30 * Math.sin(2 * (x/50));
+                    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                // Draw anti-noise
+                ctx.strokeStyle = '#ff006e'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                for (let x = 0; x < c.width; x++) {
+                    let y = c.height/2 - 30 * Math.sin(2 * (x/50));
+                    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                // Draw result (flat)
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+                ctx.beginPath();
+                for (let x = 0; x < c.width; x++) {
+                    let y = c.height/2;
+                    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        });
+    </script>
+    <div id="mic-controls">
+        <button id="start-mic">Start Microphone</button>
+        <button id="stop-mic">Stop Microphone</button>
+    </div>
+</body>
+</html>
